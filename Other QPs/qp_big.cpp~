@@ -409,7 +409,7 @@ void calc_torque()
 
  case 1:*/
     
-     std::cout << "Running with CLF and BCF" << std::endl;
+     std::cout << "Running with full comfort constraints" << std::endl;
           int nvar = 3, nineq = 2, neq = 0;
           MatrixXd H(nvar, nvar), Aiq(nineq, nvar), Aeq(neq, nvar);
           VectorXd f(nvar), biq(nineq), beq(neq);
@@ -435,7 +435,8 @@ void calc_torque()
           Aiq <<
                psi1, -1, 0,
                LgB, 0, 0;
-             
+               
+              
                }
 
           biq << -psi0, bcbf;

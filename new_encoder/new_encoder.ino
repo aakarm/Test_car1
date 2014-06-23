@@ -8,22 +8,22 @@ ros::NodeHandle  nh;
 std_msgs::Int16 encoder0_msg;
 ros::Publisher pub_encoder0( "encoder0_data", &encoder0_msg);
 
-std_msgs::Int16 encoder1_msg;
-ros::Publisher pub_encoder1( "encoder1_data", &encoder1_msg);
+//std_msgs::Int16 encoder1_msg;
+//ros::Publisher pub_encoder1( "encoder1_data", &encoder1_msg);
 
 //std_msgs::UInt16 dist_msg;
 //ros::Publisher pub_dist( "dist", &dist_msg);
 
 #define encoder0PinA  3
 #define encoder0PinB  4
-#define encoder1PinA  5
-#define encoder1PinB  6
+//#define encoder1PinA  5
+//#define encoder1PinB  6
 
 
 volatile int encoder0Pos = 0;
-volatile int encoder1Pos = 111;
+//volatile int encoder1Pos = 111;
 volatile int encoder0Flag =0;
-volatile int encoder1Flag =0;
+//volatile int encoder1Flag =0;
 int indexing = 0 ;
 
 
@@ -32,7 +32,7 @@ void setup()
  {
   nh.initNode();
   nh.advertise(pub_encoder0);  
-  nh.advertise(pub_encoder1);
+//  nh.advertise(pub_encoder1);
  // nh.advertise(pub_dist);
   
   pinMode(encoder0PinA, INPUT); 

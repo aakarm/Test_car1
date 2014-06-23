@@ -34,20 +34,14 @@
 #include <std_msgs/Float64.h>
 //#include <std_msgs/UInt32.h>
 
-#define encoder0PinA  3
-#define encoder0PinB  4
-#define encoder1PinA  5
-#define encoder1PinB  6
+#define encoder0PinA  3          //Blue and White wire
+#define encoder0PinB  4          //Deep Blue wire 
+//#define encoder1PinA  5
+//#define encoder1PinB  6
 const int Hall_Sensor_Pin = 7;    // Hal sensor attached to pin 5. 
-volatile int encoder0Pos = 0;
-volatile int encoder1Pos = 110;
-volatile int prevEncoderPos=0;
-
-double EncoderTime = 0;
-double prevTime = 0;
-double Speed = 0;
-int velocity_dt_ms = 10;
-
+volatile int encoder0Pos = 0;        
+//volatile int encoder1Pos = 110;
+int indexing = 0 ;
 
 //int encoder_ticks0 = 0;
 //int encoder_ticks1 = 0;
@@ -72,12 +66,8 @@ ros::Publisher pub_hall( "hall_data", &hall_msg);
 std_msgs::Int16 encoder0_msg;
 ros::Publisher pub_encoder0( "encoder0_data", &encoder0_msg);
 
-std_msgs::Int16 encoder1_msg;
-ros::Publisher pub_encoder1( "encoder1_data", &encoder1_msg);
-
-std_msgs::Float64 speed_msg;
-ros::Publisher pub_speed( "speed_data", &speed_msg);
-
+//std_msgs::Int16 encoder1_msg;
+//ros::Publisher pub_encoder1( "encoder1_data", &encoder1_msg);
 
 volatile byte half_revolutions;
 unsigned int rpm;
@@ -88,7 +78,7 @@ void setup()
   nh.initNode();
   nh.advertise(pub_hall);
   nh.advertise(pub_encoder0);  
-  nh.advertise(pub_encoder1);
+//  nh.advertise(pub_encoder1);
 //  nh.advertise(pub_speed);
   nh.subscribe(motor_sub);
   
@@ -111,11 +101,11 @@ void setup()
   digitalWrite(encoder0PinB, HIGH);  // turn on pullup resistor
   attachInterrupt(encoder0PinA, doEncoder0, CHANGE);  // encoder pin on interrupt 0 - pin 2
   
-  pinMode(encoder1PinA, INPUT); 
-  digitalWrite(encoder1PinA, HIGH);       // turn on pullup resistor
-  pinMode(encoder1PinB, INPUT); 
-  digitalWrite(encoder1PinB, HIGH);  // turn on pullup resistor
-  attachInterrupt(encoder1PinA, doEncoder1, CHANGE);  // encoder pin on interrupt 0 - pin 2
+//  pinMode(encoder1PinA, INPUT); 
+//  digitalWrite(encoder1PinA, HIGH);       // turn on pullup resistor
+//  pinMode(encoder1PinB, INPUT); 
+//  digitalWrite(encoder1PinB, HIGH);  // turn on pullup resistor
+//  attachInterrupt(encoder1PinA, doEncoder1, CHANGE);  // encoder pin on interrupt 0 - pin 2
   
 }
 
@@ -134,31 +124,16 @@ void loop()
   motor.writeMicroseconds(pwm);
   
      nh.spinOnce(); 
+     indexing++;
+     
+     if (indexing == 1000)   // changing this indexing limit to get the right speed of communication  // Shishir Kolathaya
+     {
+      encoder0_msg.data = encoder0Pos;
+      pub_encoder0.publish( &encoder0_msg);
 
-     encoder0_msg.data = encoder0Pos;
-     pub_encoder0.publish( &encoder0_msg);
+      indexing =0;
+     } 
      
-     encoder1_msg.data = encoder1Pos;
-     pub_encoder1.publish( &encoder1_msg);
-     
-     nh.spinOnce(); 
-     
-    
-     
-     EncoderTime = millis() - prevTime;
-     if (EncoderTime >= velocity_dt_ms){
- 
-        // circumference is 23 meters. measuring velocity every .1 sec. 4096 encoder ticks per revolution
-        Speed = (encoder0Pos - prevEncoderPos)/EncoderTime;     // scaler conversion to m/s: 230/4096
-     
-        prevTime = millis();
-        prevEncoderPos = encoder0Pos;
-        //encoder_ticks = 0;
-        }
-     
-     speed_msg.data = Speed;
-     pub_speed.publish( &speed_msg);
-
      nh.spinOnce();
     // delay(1.5);
 }
@@ -177,43 +152,28 @@ void doEncoder0() {
    * For more information on speeding up this process, see
    * [Reference/PortManipulation], specifically the PIND register.
    */ 
-  if (digitalRead(encoder0PinA) == digitalRead(encoder0PinB)) {
-    encoder0Pos++;
-   //encoder_ticks0++;
-  } else {
-    encoder0Pos--;
-    //encoder_ticks0++;
-  }
- }
-  
-   void doEncoder1() {
-  /* If pinA and pinB are both high or both low, it is spinning
-   * forward. If they're different, it's going backward.
-   *
-   * For more information on speeding up this process, see
-   * [Reference/PortManipulation], specifically the PIND register.
-   */ 
-  if (digitalRead(encoder1PinA) == digitalRead(encoder1PinB)) {
-    encoder1Pos++;
-   //encoder_ticks1++;
-  }
+    if (digitalRead(encoder0PinA) == digitalRead(encoder0PinB)) {
+      encoder0Pos++;
+      } 
     else {
-    encoder1Pos--;
-    //encoder_ticks1++;
-          }
-}
-
-//void get_rpm_Encoder(){
-//  EncoderTime = millis() - prevTime;
-//  if (EncoderTime >= velocity_dt_ms){
-// 
-//    // circumference is 23 meters. measuring velocity every .1 sec. 4096 encoder ticks per revolution
-//    Speed = (encoder0Pos - prevEncoderPos)/EncoderTime;     // scaler conversion to m/s: 230/4096
-//    //Serial.println(encoder_ticks*230/4096);
-//    // conversion to m/s
-//    //Serial.println(Speed);
-//    prevTime = millis();
-//    prevEncoderPos = encoder0Pos;
-//    //encoder_ticks = 0;
+          encoder0Pos--;
+         }
+     }
+  
+//   void doEncoder1() {
+//  /* If pinA and pinB are both high or both low, it is spinning
+//   * forward. If they're different, it's going backward.
+//   *
+//   * For more information on speeding up this process, see
+//   * [Reference/PortManipulation], specifically the PIND register.
+//   */ 
+//  if (digitalRead(encoder1PinA) == digitalRead(encoder1PinB)) {
+//    encoder1Pos++;
+//   //encoder_ticks1++;
 //  }
+//    else {
+//    encoder1Pos--;
+//    //encoder_ticks1++;
+//          }
 //}
+

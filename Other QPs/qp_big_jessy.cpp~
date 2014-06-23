@@ -38,19 +38,17 @@ using namespace eiquadprog;
 
 double convert_rpm_to_vel = 0.00932;
 double convert_vel_to_rpm = 1/ 0.00932;
-double v_desired = 2;
+double v_desired = 6;
 int last_vel = 0;
 int pwm;
 //double input_vel;
 double input_pwm = 1400;
-int pwm_low = 1450;
+int pwm_low = 1430;
 int pwm_high = 1300;
 double current_rpm;
 double current_vel;
 //double Kp = 0.00000004;
-double Kp = 0.8;     // 0.8
-double Kp_brake = 1.2;     // 0.8
-double Kp_acc = 0.8;     // 0.8 
+double Kp = 0.8;
 double error;
 double P = 0;
 double v_internal;
@@ -59,30 +57,13 @@ void calc_torque();
 bool new_data = false;
 bool internal_is_initialized = false;
 double dist_0 = 0;
-//double dist_1 = 0;
-double dist = 0;
+double dist_1 = 1000;
+double dist = 5;
 //void calc_distance();
 double u_qp;
 double limit = 0.5;
-//bool counter = false;
-double Bcalc;
-double Distcalc;
-double V;
-double V_dot;
-double B_dot;
-double bar_gain = 1;
-double relax_error = 0.001;
-
-
-//// Things to possibly change
-/// Increase the relax_error if QP is failing
-/// Change bar_gain if the distance is too large or too small
-/// Change between v_interal and current_vel in the QP error calculation**** See notes below
-
-/// Small epsilon if running internal velocity epsilon = 1-10
-/// Large epsilon if running the current_vel epsilon = 30
-
-
+bool counter = false;
+//int solver = 0;
 
 
 void hall_callback(const std_msgs::UInt16& hall_msg)
@@ -102,16 +83,15 @@ void desired_cb(const std_msgs::UInt16& desired_msg)
 
 void dist_0_cb(const std_msgs::Int16& dist_0_msg)
 {
- //ROS_INFO ("Received desired velocity");
  dist_0 = dist_0_msg.data;
  new_data = true;
 }
 
-/*void dist_1_cb(const std_msgs::Int64& dist_1_msg)
+void dist_1_cb(const std_msgs::Int16& dist_1_msg)
 {
  dist_1 = dist_1_msg.data;
  new_data = true;
-}*/
+}
 
 /*void switch_callback(const std_msgs::Int32ConstPtr &msg)
 {
@@ -157,7 +137,7 @@ int main(int argc, char **argv)
 
   ros::Subscriber sub_dist_0 = nh.subscribe("encoder0_data", 1000, dist_0_cb);
   
-  //ros::Subscriber sub_dist_1 = nh.subscribe("encoder1_data", 1000, dist_1_cb);
+  ros::Subscriber sub_dist_1 = nh.subscribe("encoder1_data", 1000, dist_1_cb);
   
   ros::Subscriber sub_reset = nh.subscribe("reset_internal", 1000, reset_internal_cb);
   
@@ -173,19 +153,11 @@ int main(int argc, char **argv)
   
   ros::Publisher pub_desired = nh.advertise<std_msgs::UInt16>("desired_pub", 1000);
    
-  ros::Publisher pub_current = nh.advertise<std_msgs::Float64>("current_pub", 1000);
+  ros::Publisher pub_current = nh.advertise<std_msgs::UInt16>("current_pub", 1000);
   
-  ros::Publisher pub_force_qp = nh.advertise<std_msgs::Float64>("force_qp_pub", 1000);
+  ros::Publisher pub_force_qp = nh.advertise<std_msgs::UInt16>("force_qp_pub", 1000);
   
   ros::Publisher pub_rel = nh.advertise<std_msgs::Float64>("rel_pub", 1000);
-  
-  ros::Publisher pub_barrier = nh.advertise<std_msgs::Float64>("barrier", 1000);
-  
-  ros::Publisher pub_V = nh.advertise<std_msgs::Float64>("lyapunov", 1000);
-  
-  ros::Publisher pub_vdot = nh.advertise<std_msgs::Float64>("Vdot", 1000);
-  
-  ros::Publisher pub_bdot = nh.advertise<std_msgs::Float64>("Bdot", 1000);
   
   //ros::Rate loop_rate(100);
   ros::Rate loop(loop_rate);
@@ -200,16 +172,12 @@ int main(int argc, char **argv)
         ROS_INFO("Initialize v_internal: %g", v_internal);
         internal_is_initialized = true;
       }
-      
      // ROS_INFO("Looping");
       std::cout << "v_desired " << v_desired << std::endl;
 
-      dist = (dist_0)*0.00562;              //-(dist_1 - dist_0)*0.00562;
-	    std::cout << "distance_rel " << dist << std::endl;
-	    
+      dist = (dist_1 - dist_0)*0.00562;
 	    calc_torque();
       calc_speed();
-      
       std_msgs::UInt16 pwm;
       //std_msgs::UInt16 error;
 
@@ -237,51 +205,21 @@ int main(int argc, char **argv)
       
       
       {
-        std_msgs::Float64 msg;
+        std_msgs::UInt16 msg;
         msg.data = current_vel;                // publishing current velocity 
         pub_current.publish(msg);
       }
       
       {
-        std_msgs::Float64 msg;
+        std_msgs::UInt16 msg;
         msg.data = u_qp;                   // publishing force output from the QP 
         pub_force_qp.publish(msg);
       }
       
       {
         std_msgs::Float64 msg;
-        msg.data = dist;                   // publishing relatve distance from the QP 
+        msg.data = dist;                   // publishing force output from the QP 
         pub_rel.publish(msg);
-      }
-      
-      {
-        std_msgs::Float64 msg;
-        msg.data = Bcalc;                   // publishing barrier function from the QP 
-        pub_barrier.publish(msg);
-      }
-      
-      {
-        std_msgs::Float64 msg;
-        msg.data = Distcalc;                   // publishing Distcalc from the QP 
-        pub_barrier.publish(msg);
-      }
-      
-       {
-        std_msgs::Float64 msg;
-        msg.data = V;                   // publishing V from the QP 
-        pub_V.publish(msg);
-      }
-      
-       {
-        std_msgs::Float64 msg;
-        msg.data = V_dot;                   // publishing V_dot from the QP 
-        pub_vdot.publish(msg);
-      }
-      
-       {
-        std_msgs::Float64 msg;
-        msg.data = B_dot;                   // publishing B_dot from the QP 
-        pub_bdot.publish(msg);
       }
       
 
@@ -305,17 +243,25 @@ void calc_speed(){
   error = current_vel - v_internal;
     std::cout << "current_vel " << current_vel << std::endl;
   std::cout << "error_MI " << error << std::endl;
-  
-          if (error < 0)
-           {
-           Kp = Kp_acc;
-           }
-         else
-           {
-           Kp = Kp_brake; 
-           }
-       
  
+   /*if (dist <= limit)
+   {
+      P = 0;
+      input_pwm = 1500;
+      std::cout << "neutral" << std::endl;
+     // new_data = true;  
+    }
+    
+    else {*/
+     if (counter = true)
+      {
+        if (dist > limit)
+        {
+        input_pwm = 1410;
+        counter = false;
+        }
+      }  
+      
           P = error*Kp;
 
           input_pwm = input_pwm + P;  // this value needs to be scaled or mapped to the operating range of angles
@@ -328,15 +274,14 @@ void calc_speed(){
         
         /// @todo Address scaling and regions
       	if (abs(input_pwm)< pwm_high) 
-      	    {
+      	  {
             input_pwm = pwm_high;
             }
             if (abs(input_pwm)> pwm_low){
-            input_pwm = pwm_low;
-            current_vel = 0;
-      	    }
-      	      	  
-      // }
+            input_pwm = 1460;
+            counter = true;
+      	  } 	  
+    //}
 }
 
 
@@ -347,50 +292,46 @@ void calc_torque()
 	
 	double F_r = (0.1 + 5*v_internal + 0.25*v_internal);
 	double m = 9.07;
-	double ep = 10;    //50
+	double ep = 10;
 	double y = v_internal - v_desired;
 	
 	std::cout << "distance " << dist << std::endl;
+
     
     std::cout << "error_QP " << y << std::endl;
     
     if (std::fabs(y) > 1.4e-5)
     {
-    
-        double g = 9.80;
-        double c_a = 1;
-    
-        double psi0 = -(2*y*F_r)/m + (ep*y*y);
-        double psi1 = (2*y)/m;
-    
-    //// constaints associated with this case
-      double gamma = 0.000001;
-      
-    /// 1/x Barrier function
-    
-      double Distcalc = dist- bar_gain*v_internal;      // check for 1.8 and constant
-      Bcalc = 1/(Distcalc);
-      
-      std::cout << "Barrier func " << Bcalc << std::endl;
-      std::cout << "Distcalc " << Distcalc << std::endl;
-      
-      double LfB = (- F_r*bar_gain + m*(-v_desired + v_internal))/(m*((-bar_gain*v_internal)+dist)*((-bar_gain*v_internal)+dist));
-      
-      double LgB = bar_gain/(m*(-bar_gain*v_internal+dist)*(-bar_gain*v_internal+dist));
+  
+      double g = 9.80;
+      double c_a = 1;
+  
+      double psi0 = -(2*y*F_r)/m + (ep*y*y);
+      double psi1 = (2*y)/m;
 
+      
+     	double bar = (-1/2).*c.^(-1).*g.^(-1).*(v_desired+(-1).*v_internal).^2+(-1).*d.*v_internal+dist;
+	    double B2 = 1/bar;
+	    double LfB2 = (-4).*c.*g.*m.^(-1).*(c.*g.*(d.*F_r+m.*(v_desired+(-1).*v_internal))+F_r.*((-1).*v_desired+v_internal)).*((v_desired+(-1).*v_internal).^2+2.*c.*g.*(d.*v_internal+(-1).*dist)).^(-2);
 
-    /// Resulting inequality constraint matricies
+	    double LgB2 = 4.*c.*g.*m.^(-1).*(c.*d.*g+(-1).*v_desired+v_internal).*((v_desired+(-1).*v_internal).^2+2.*c.*g.*(d.*v_internal+(-1).*dist)).^(-2);
 
-    //  Acbf = [LgB  ,  0, 0];
-      double bcbf = -LfB + gamma/(Bcalc);
-
-   
-/* switch (solver)
+	    double Distcalc = 2*dist-v_internal;
+      double Bcalc = 1/(Distcalc);
+    
+      double LfB = - (F_r + 2*m*(v_desired - v_internal))/(m*(v_internal-2*dist)^2);
+      double LgB = 1/(m*(v_internal-2*dist)^2);
+  
+   /* int nvar, nineq, neq;
+    
+ switch (solver)
  {
     case 0:
     
       std::cout << "Running without contstraints" << std::endl;
-          int nvar = 1, nineq = 1, neq = 0;
+          nvar = 1;
+          nineq = 1;
+          neq = 0;
           MatrixXd H(nvar, nvar), Aiq(nineq, nvar), Aeq(neq, nvar);
           VectorXd f(nvar), biq(nineq), beq(neq);
 
@@ -407,10 +348,10 @@ void calc_torque()
           biq << -psi0;
           break;
 
- case 1:*/
+ case 1:  */
     
-     std::cout << "Running with CLF and BCF" << std::endl;
-          int nvar = 3, nineq = 2, neq = 0;
+      std::cout << "Running with full confort constraints" << std::endl;
+          int nvar = 3, nineq = 3, neq = 0;
           MatrixXd H(nvar, nvar), Aiq(nineq, nvar), Aeq(neq, nvar);
           VectorXd f(nvar), biq(nineq), beq(neq);
 
@@ -420,25 +361,12 @@ void calc_torque()
               0, 0, 2*10^(10);
 
           f << 2*(F_r/(m*m)), 0, 0;
-          
-          if (LgB < relax_error)
-          {
- 
-           Aiq <<
-               psi1, -1, 0,
-               LgB, 0, -1;         
-          
-          
-          }
-          else {
 
           Aiq <<
-               psi1, -1, 0,
-               LgB, 0, 0;
-             
-               }
-
-          biq << -psi0, bcbf;
+                psi1, -1, 0,
+                LgB2, 0, 0,
+		            0, 0, (-LfB2 + (1/B2));
+          biq << -psi0, c_a*m*g, c_a*m*g;
          // break;
     
      //default: 
@@ -460,37 +388,15 @@ void calc_torque()
     
         try
         {
-
-            //if (counter = true)
-            // {
-              if (Bcalc < 0)
-              {
-                  // Don't solve the QP if the Barrier function is negative
-                  v_internal = 0;
-                  // Fake the data...
-                  u_qp = 0;
-                  V_dot = -(2*y*F_r)/m + (2*y)*u_qp/m;
-                  V = y*y;
-                  B_dot = LfB + LgB*u_qp;
-                 
-               }
-            
-             else {
-             // Solve the QP 
-             /// @todo Note that for this specific problem, if we change H to H/2, we get same answer but 	different objective
+            /// @todo Note that for this specific problem, if we change H to H/2, we get same answer but 	different objective
             obj_actual = eiquadprog::solve_quadprog(H, f, -Aeq.transpose(), -beq.transpose(), -Aiq.transpose(), biq, x_actual, equality_tolerance, iter_max, &iters);
         
             //ROS_INFO("QP solved");
         
             u_qp = x_actual(0);
-            
-            V_dot = -(2*y*F_r)/m + (2*y)*u_qp/m;
-            V = y*y;
-            B_dot = LfB + LgB*u_qp;
-             
+        
             // Integrate forward
-                    v_internal += (u_qp - F_r)*dt_loop;
-                  }
+            v_internal += (u_qp - F_r)*dt_loop;
         }
         catch (eiquadprog::QPException &ex)
         {
