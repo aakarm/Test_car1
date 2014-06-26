@@ -126,7 +126,7 @@ void loop()
      nh.spinOnce(); 
      indexing++;
      
-     if (indexing == 1000)   // changing this indexing limit to get the right speed of communication  // Shishir Kolathaya
+     if (indexing == 15000)   // changing this indexing limit to get the right speed of communication  // Shishir Kolathaya
      {
       encoder0_msg.data = encoder0Pos;
       pub_encoder0.publish( &encoder0_msg);
